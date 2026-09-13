@@ -2,6 +2,7 @@ import { Node } from "./node";
 import { Network } from "./network";
 import { SimEvent } from "./node";
 import { decodeRawTx } from "./tx";
+import { decodeData } from "./contracts";
 import { Hex } from "./crypto";
 
 export type BlockTag = "latest" | "pending" | number | string;
@@ -23,6 +24,8 @@ export const RPC_METHODS = [
   "eth_getBlockByNumber",
   "eth_getTransactionByHash",
   "eth_getTransactionReceipt",
+  "eth_call",
+  "eth_getCode",
   "txpool_content",
   "net_peerCount",
 ] as const;
@@ -87,6 +90,17 @@ export function handleRpc(node: Node, req: RpcRequest, now: number, net: Network
         const pending = node.mempool.get(h);
         if (pending) return { result: { ...pending, blockNumber: null } };
         return { result: null };
+      }
+      case "eth_call": {
+        // Free read: run contract code against this node's latest state, change nothing, return the result.
+        const { to, data } = p0 as { to: Hex; data: string };
+        const d = decodeData(data) as { method: string; args: unknown[] };
+        try { return { result: node.state.call(String(to).toLowerCase() as Hex, d.method, d.args) }; }
+        catch (e) { return { error: { code: 3, message: `execution reverted: ${(e as Error).message}` } }; }
+      }
+      case "eth_getCode": {
+        const acct = node.state.get(String(p0).toLowerCase() as Hex);
+        return { result: acct.code ? `toy:${acct.code}` : "0x" };
       }
       case "eth_getTransactionReceipt":
         return { result: node.receipts.get(String(p0) as Hex) ?? null };

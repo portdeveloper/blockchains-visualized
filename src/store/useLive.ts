@@ -4,6 +4,7 @@ import { Simulation } from "@/sim/sim";
 import { encodeRawTx, Tx } from "@/sim/tx";
 import { Hex } from "@/sim/crypto";
 import { ETH, fmtEth } from "@/lib/eth";
+import { encodeData } from "@/sim/contracts";
 
 export type Hop = "app→rpc" | "rpc→node" | "node→rpc" | "rpc→app" | "bob→rpc2" | "rpc2→node2" | "node2→rpc2" | "rpc2→bob";
 export type Owner = "you" | "bob";
@@ -18,6 +19,8 @@ export interface Flight {
 export interface AppTx {
   owner: Owner;
   hash: Hex;
+  /** Human label for contract interactions, e.g. "deploy SHOP" or "transfer 10 SHOP → you". */
+  label?: string;
   tx: Tx;
   signedAt?: number;
   sentAt?: number;
@@ -50,6 +53,11 @@ interface LiveStore {
   blockNumber: number;
   bobBalance: number;
   bobBlockNumber: number;
+  /** The SHOP token contract once Bob has deployed it (as seen by each user's node). */
+  tokenAddr: Hex | null;
+  tokenBalances: { you: number | null; bob: number | null };
+  deployToken: () => Promise<void>;
+  sendToken: (to: number, amount: number, as: Owner) => Promise<void>;
   incoming: { id: string; owner: Owner; from: string; value: number; block: number }[];
   /** Last block applied by the RPC node, with where each tx sat in the mempool list just before. Drives the fly animation. */
   lastApplied: { blockHash: string; entries: { hash: Hex; blockIdx: number; mempoolIdx: number | null }[] } | null;
@@ -59,7 +67,7 @@ interface LiveStore {
   setTraffic: (t: boolean) => void;
   addFlight: (f: Omit<Flight, "id">) => void;
   removeFlight: (id: number) => void;
-  send: (to: number, value: number, as?: Owner) => Promise<void>;
+  send: (to: number, value: number, as?: Owner, opts?: { toAddress?: Hex; data?: string; label?: string }) => Promise<void>;
   poll: () => void;
   reset: () => void;
 }
@@ -91,6 +99,8 @@ export const useLive = create<LiveStore>((set, get) => {
   blockNumber: 0,
   bobBalance: 10 * ETH,
   bobBlockNumber: 0,
+  tokenAddr: null,
+  tokenBalances: { you: null, bob: null },
   incoming: [],
   lastApplied: null,
   tick: (dt) => {
@@ -99,9 +109,9 @@ export const useLive = create<LiveStore>((set, get) => {
     const headBefore = rn.head().hash;
     const snapshot = new Map<Hex, number>();
     [...rn.mempool.values()].sort((a, b) => b.gasPrice - a.gasPrice || a.nonce - b.nonce).forEach((tx, i) => snapshot.set(tx.hash, i));
-    // Background traffic: other people's wallets, talking to other nodes.
+    // Background traffic: other people's wallets (never you or Bob, so nonces don't collide), talking to other nodes.
     if (traffic && Math.random() < dt / 1800) {
-      const f = 1 + Math.floor(Math.random() * (sim.accounts.length - 1));
+      const f = 2 + Math.floor(Math.random() * (sim.accounts.length - 2));
       let t = Math.floor(Math.random() * sim.accounts.length);
       if (t === f) t = (t + 1) % sim.accounts.length;
       const n = Math.floor(Math.random() * sim.nodes.length);
@@ -125,7 +135,7 @@ export const useLive = create<LiveStore>((set, get) => {
   removeFlight: (id) => set((s) => ({ flights: s.flights.filter((f) => f.id !== id) })),
 
   /** The app's send flow, animated hop by hop so the learner sees each leg. Works for you (left) and Bob (right). */
-  send: async (to, value, as = "you") => {
+  send: async (to, value, as = "you", opts = {}) => {
     const { sim, addFlight } = get();
     const acctIdx = as === "you" ? 0 : get().bobAccount;
     const nodeId = as === "you" ? get().rpcNode : get().bobNode;
@@ -137,8 +147,8 @@ export const useLive = create<LiveStore>((set, get) => {
       const r = sim.rpc(nodeId, { method: "eth_getTransactionCount", params: [me.address, "pending"] });
       return r.result ? parseInt(r.result as string, 16) : node.state.get(me.address).nonce;
     })();
-    const tx = sim.buildAndSign(acctIdx, sim.accounts[to].address, value, 2, nonce);
-    const entry: AppTx = { owner: as, hash: tx.hash, tx, to, value, status: "signing", at: sim.now };
+    const tx = sim.buildAndSign(acctIdx, opts.toAddress ?? sim.accounts[to].address, value, 2, nonce, opts.data);
+    const entry: AppTx = { owner: as, hash: tx.hash, tx, to, value, status: "signing", at: sim.now, label: opts.label };
     set((s) => ({ appTxs: [entry, ...s.appTxs].slice(0, 10), tracked: tx.hash }));
     await wait(500 / get().speed);
     const upd = (patch: Partial<AppTx>) => set((s) => ({ appTxs: s.appTxs.map((t) => (t.hash === tx.hash ? { ...t, ...patch } : t)) }));
@@ -159,6 +169,18 @@ export const useLive = create<LiveStore>((set, get) => {
     if (res.error) upd({ status: "rejected", error: res.error.message });
     else upd({ status: "pending" });
     set((s) => ({ version: s.version + 1 }));
+  },
+
+  /** Bob deploys the SHOP token: a transaction with no recipient and a data field carrying the program. */
+  deployToken: async () => {
+    await get().send(0, 0, "bob", { toAddress: "", data: encodeData({ deploy: "token", args: ["Shop Token", "SHOP", 1000] }), label: "deploy SHOP token" });
+  },
+  /** A token transfer is a transaction *to the contract* with value 0; the amount lives in the data field. */
+  sendToken: async (to, amount, as) => {
+    const { tokenAddr, sim } = get();
+    if (!tokenAddr) return;
+    const who = to === 0 ? "you" : to === 1 ? "Bob" : `wallet ${to}`;
+    await get().send(to, 0, as, { toAddress: tokenAddr, data: encodeData({ method: "transfer", args: [sim.accounts[to].address, amount] }), label: `transfer ${amount} SHOP → ${who}` });
   },
 
   /** What real apps do constantly: ask the RPC for the latest block and balance, and for receipts of pending txs. */
@@ -186,6 +208,15 @@ export const useLive = create<LiveStore>((set, get) => {
           const ids = found.map((f) => f.id);
           setTimeout(() => set((s) => ({ incoming: s.incoming.filter((x) => !ids.includes(x.id)) })), 5000 / get().speed);
         }
+        // Token balance: a free eth_call that runs contract code on the node and returns the result.
+        const tokenAddr = sim.findContract(side.node, "token");
+        let tokenBal: number | null = null;
+        if (tokenAddr) {
+          const r = sim.rpc(side.node, { method: "eth_call", params: [{ to: tokenAddr, data: encodeData({ method: "balanceOf", args: [me.address] }) }] });
+          tokenBal = typeof r.result === "number" ? r.result : null;
+          addFlight({ label: "eth_call balanceOf · free", hop: side.res, kind: "poll", ms: hop() });
+        }
+        set((s) => ({ tokenAddr: side.owner === "you" ? tokenAddr : s.tokenAddr ?? tokenAddr, tokenBalances: { ...s.tokenBalances, [side.owner]: tokenBal } }));
         const newBal = bal.result ? parseInt(bal.result as string, 16) : undefined;
         const last = { method: "eth_getBalance", params: [me.address.slice(0, 10) + "…", "latest"], response: bal };
         if (side.owner === "you") set({ blockNumber: newBn, balance: newBal ?? get().balance, lastRpc: last });
@@ -197,11 +228,15 @@ export const useLive = create<LiveStore>((set, get) => {
           if (rec) {
             addFlight({ label: `receipt: block #${rec.blockNumber} ${rec.status}`, hop: side.res, kind: "res", ms: hop() });
             set((s) => ({ appTxs: s.appTxs.map((x) => (x.hash === t.hash ? { ...x, status: "mined", block: rec.blockNumber, fee: rec.fee, receiptAt: sim.now } : x)) }));
+          } else {
+            // No receipt, but the account's nonce moved past ours: another tx with the same nonce won. Ours can never be mined.
+            const nonceNow = parseInt((sim.rpc(side.node, { method: "eth_getTransactionCount", params: [me.address, "latest"] }).result as string) ?? "0x0", 16);
+            if (nonceNow > t.tx.nonce) set((s) => ({ appTxs: s.appTxs.map((x) => (x.hash === t.hash ? { ...x, status: "rejected", error: `dropped: nonce ${t.tx.nonce} was used by another transaction` } : x)) }));
           }
         }
       }, hop());
     }
   },
-  reset: () => set({ sim: new Simulation({ seed: Math.floor(Math.random() * 1e6), nodeCount: 4, blockTimeMs: 12000, accountCount: 5, initialBalance: 10 * ETH }), appTxs: [], flights: [], lastRpc: null, lastRpcBob: null, tracked: null, balance: 10 * ETH, blockNumber: 0, bobBalance: 10 * ETH, bobBlockNumber: 0, incoming: [], lastApplied: null, version: 0 }),
+  reset: () => set({ sim: new Simulation({ seed: Math.floor(Math.random() * 1e6), nodeCount: 4, blockTimeMs: 12000, accountCount: 5, initialBalance: 10 * ETH }), appTxs: [], flights: [], lastRpc: null, lastRpcBob: null, tracked: null, balance: 10 * ETH, blockNumber: 0, bobBalance: 10 * ETH, bobBlockNumber: 0, tokenAddr: null, tokenBalances: { you: null, bob: null }, incoming: [], lastApplied: null, version: 0 }),
 };
 });

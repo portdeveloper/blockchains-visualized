@@ -52,6 +52,17 @@ export function BlockDetail({ block, onClose, width }: { block: Block; onClose: 
           </tbody>
         </table>
       )}
+      {block.receipts.some((r) => r.logs?.length || r.contractAddress) && (
+        <>
+          <h3 className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Contract activity</h3>
+          <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-violet-200">
+            {block.receipts.flatMap((r) => [
+              ...(r.contractAddress ? [<li key={r.txHash + "c"}>new contract at {short(r.contractAddress, 5)}</li>] : []),
+              ...(r.logs ?? []).map((l, i) => <li key={r.txHash + i}>{l.event}({Object.entries(l.args).map(([k, v]) => `${k}: ${typeof v === "string" && v.startsWith("0x") && v.length > 10 ? name(v) : v}`).join(", ")})</li>),
+            ])}
+          </ul>
+        </>
+      )}
       {fees > 0 && <p className="mt-3 rounded bg-amber-500/10 p-2 text-[11px] text-amber-200">Fees in this block: {fmtEth(fees)}, paid to {name(block.header.proposer)} for doing the work of proposing it.</p>}
       <button className="mt-auto self-start pt-6 text-sm text-zinc-500 hover:text-zinc-300" onClick={onClose}>close</button>
     </motion.aside>

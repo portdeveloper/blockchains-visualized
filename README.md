@@ -2,11 +2,11 @@
 
 An interactive site that teaches how a blockchain works by running a toy one in your browser.
 
-- **Live view** (`/`): a website with a MetaMask-style wallet extension, an RPC, a four-node network, a mempool, and a chain producing a block every 12 seconds. Send a transaction and follow its whole lifecycle. Pan, zoom, and focus on any part for an explanation.
+- **Live view** (`/`): two browser windows with MetaMask-style wallet extensions on two RPCs, a four-node network, a mempool, a toy smart contract (a SHOP token you can deploy and transfer), and a chain producing a block every 12 seconds. Everything is denominated in ETH and gwei. Send a transaction and follow its whole lifecycle. Pan, zoom, and focus on any part for an explanation.
 - **Lessons** (`/course`): build a blockchain from scratch, one primitive per step (hash → block → chain → peers).
 - **Inspector** (`/playground`): the dense engineering view with a JSON-RPC console and event log.
 
-Real keccak256 and secp256k1 (via `@noble/*`); toy execution (balance transfers only); round-robin proposer standing in for consensus.
+Real keccak256 and secp256k1 (via `@noble/*`); toy execution (ETH transfers plus a tiny TypeScript contract runtime, not an EVM); round-robin proposer standing in for consensus.
 
 ## Run
 

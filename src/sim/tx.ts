@@ -1,6 +1,8 @@
 import { Hex, keccak, recoverAddress, sign, fromHex } from "./crypto";
 
 export const GAS_PER_TX = 21_000;
+export const GAS_CALL = 50_000;
+export const GAS_DEPLOY = 100_000;
 
 export interface UnsignedTx {
   from: Hex;
@@ -8,6 +10,8 @@ export interface UnsignedTx {
   value: number;
   nonce: number;
   gasPrice: number;
+  /** Contract deploy or call payload (JSON in this toy; ABI-encoded bytes on Ethereum). Absent for plain transfers. */
+  data?: string;
 }
 
 export interface Tx extends UnsignedTx {
@@ -17,7 +21,7 @@ export interface Tx extends UnsignedTx {
 
 /** Canonical serialization. Field order matters — it's what gets hashed. */
 export function serializeUnsigned(tx: UnsignedTx): string {
-  return JSON.stringify({ from: tx.from, to: tx.to, value: tx.value, nonce: tx.nonce, gasPrice: tx.gasPrice });
+  return JSON.stringify({ from: tx.from, to: tx.to, value: tx.value, nonce: tx.nonce, gasPrice: tx.gasPrice, data: tx.data ?? "" });
 }
 
 export const unsignedHash = (tx: UnsignedTx): Hex => keccak(serializeUnsigned(tx));
@@ -41,7 +45,9 @@ export function verifyTx(tx: Tx): { ok: true } | { ok: false; reason: string } {
   return { ok: true };
 }
 
-export const txFee = (tx: UnsignedTx): number => GAS_PER_TX * tx.gasPrice;
+/** Gas used depends on what the tx does: 21k for a transfer, more when code runs. */
+export const gasFor = (tx: UnsignedTx): number => (!tx.data ? GAS_PER_TX : tx.to === "" ? GAS_DEPLOY : GAS_CALL);
+export const txFee = (tx: UnsignedTx): number => gasFor(tx) * tx.gasPrice;
 
 /** "Raw transaction" as a wallet would hand to eth_sendRawTransaction: hex-encoded signed payload. */
 export function encodeRawTx(tx: Tx): Hex {

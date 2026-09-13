@@ -1,5 +1,5 @@
 import { Block, BlockHeader, headerHash, txRootOf } from "./block";
-import { Keypair, keypairFromPriv } from "./crypto";
+import { Hex, Keypair, keypairFromPriv } from "./crypto";
 import { Network, Message } from "./network";
 import { Node, SimEvent } from "./node";
 import { Rng } from "./rng";
@@ -114,9 +114,9 @@ export class Simulation {
   }
 
   /** Convenience for the wallet UI: sign with a known account. */
-  buildAndSign(fromIdx: number, to: string, value: number, gasPrice: number, nonce: number): Tx {
+  buildAndSign(fromIdx: number, to: string, value: number, gasPrice: number, nonce: number, data?: string): Tx {
     const kp = this.accounts[fromIdx];
-    const unsigned: UnsignedTx = { from: kp.address, to: to.toLowerCase(), value, nonce, gasPrice };
+    const unsigned: UnsignedTx = { from: kp.address, to: to.toLowerCase(), value, nonce, gasPrice, ...(data ? { data } : {}) };
     return signTx(unsigned, kp.priv);
   }
 
@@ -129,6 +129,12 @@ export class Simulation {
       b.txs.forEach((tx, idx) => st.applyTx(tx, b.header.proposer, { blockNumber: b.header.number, blockHash: b.hash, index: idx }));
     }
     return st;
+  }
+
+  /** First contract of a given type in a node's state, if any. */
+  findContract(nodeId: number, type: string): Hex | null {
+    for (const [a, acct] of this.nodes[nodeId].state.accounts) if (acct.code === type) return a;
+    return null;
   }
 
   inflight(): readonly Message[] {

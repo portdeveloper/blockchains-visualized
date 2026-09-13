@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 
-export type FocusId = "wallet" | "rpc" | "node" | "mempool" | "network" | "bob" | "block" | "chain" | "lifecycle";
+export type FocusId = "wallet" | "rpc" | "node" | "mempool" | "network" | "bob" | "contract" | "block" | "chain" | "lifecycle";
 
 export interface FocusInfo {
   id: FocusId;
@@ -11,7 +11,7 @@ export interface FocusInfo {
   ethereum: string[];
 }
 
-export const FOCUS_ORDER: FocusId[] = ["wallet", "rpc", "node", "mempool", "network", "bob", "block", "chain", "lifecycle"];
+export const FOCUS_ORDER: FocusId[] = ["wallet", "rpc", "node", "mempool", "network", "bob", "block", "chain", "lifecycle", "contract"];
 
 export const FOCUS: Record<FocusId, FocusInfo> = {
   wallet: {
@@ -79,6 +79,18 @@ export const FOCUS: Record<FocusId, FocusInfo> = {
     ),
     watch: ["Pay Bob and watch the green 'received' banner appear in his window a block later.", "Bob's block number can lag yours by a moment while a block is still gossiping to Frankfurt.", "Press Pay as Bob: his request travels to his own RPC, never to yours."],
     ethereum: ["Two people using MetaMask usually hit different RPC providers without knowing it.", "Wallets show the same balances because every node computes them the same way."],
+  },
+  contract: {
+    id: "contract", label: "smart contract", title: "A smart contract",
+    body: (
+      <>
+        <p>Everything so far moved ETH between accounts. A <b>smart contract</b> is an account that holds a <b>program</b> and some <b>storage</b> instead of a private key. Nobody owns it; the code decides what it does.</p>
+        <p>Bob deploys a token contract: a transaction with no recipient whose data field carries the program. Every node stores it at a new address. From then on, &quot;send 10 SHOP&quot; is a transaction <em>to the contract</em> with zero ETH and a data field saying <code>transfer(you, 10)</code>. Every node runs the same code and updates the same storage, so every node agrees on who owns what.</p>
+        <p>Reading a balance is a free <code>eth_call</code>: the node runs the code locally and tells you the answer without a transaction.</p>
+      </>
+    ),
+    watch: ["Deploy from Bob's shop, then watch the contract box fill with code and storage.", "Send SHOP and follow the violet chip. Its value is 0 ETH; the tokens move in storage.", "Try sending more SHOP than you have. The transaction is included, reverts, and still pays gas."],
+    ethereum: ["Every ERC-20 token, NFT, and DEX is a contract like this, written in Solidity and run by the EVM.", "A token transfer costs around 50,000 gas, more than double a plain ETH transfer, because code runs."],
   },
   block: {
     id: "block", label: "block", title: "A block",

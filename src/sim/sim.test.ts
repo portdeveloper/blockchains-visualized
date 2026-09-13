@@ -62,3 +62,36 @@ describe("simulation", () => {
     expect(verifyTx(tx).ok).toBe(true);
   });
 });
+
+describe("contracts", () => {
+  it("deploys a token, transfers it, reads balances for free, and reverts on overspend", async () => {
+    const { encodeData } = await import("./contracts");
+    const { State } = await import("./state");
+    const sim = new Simulation({ seed: 5, nodeCount: 3, blockTimeMs: 2000 });
+    const bob = 1, you = 0;
+    const deploy = sim.buildAndSign(bob, "", 0, 2, 0, encodeData({ deploy: "token", args: ["Shop Token", "SHOP", 1000] }));
+    sim.rpc(0, { method: "eth_sendRawTransaction", params: [encodeRawTx(deploy)] });
+    sim.step(4000);
+    const addr = State.contractAddress(sim.accounts[bob].address, 0);
+    expect(sim.findContract(0, "token")).toBe(addr);
+    expect(sim.nodes[0].receipts.get(deploy.hash)?.contractAddress).toBe(addr);
+    const bal = (who: number) => sim.rpc(0, { method: "eth_call", params: [{ to: addr, data: encodeData({ method: "balanceOf", args: [sim.accounts[who].address] }) }] }).result;
+    expect(bal(bob)).toBe(1000);
+    const t1 = sim.buildAndSign(bob, addr, 0, 2, 1, encodeData({ method: "transfer", args: [sim.accounts[you].address, 300] }));
+    const t2 = sim.buildAndSign(bob, addr, 0, 2, 2, encodeData({ method: "transfer", args: [sim.accounts[you].address, 5000] }));
+    sim.rpc(0, { method: "eth_sendRawTransaction", params: [encodeRawTx(t1)] });
+    sim.rpc(0, { method: "eth_sendRawTransaction", params: [encodeRawTx(t2)] });
+    sim.step(4000);
+    expect(bal(you)).toBe(300);
+    expect(bal(bob)).toBe(700);
+    const r2 = sim.nodes[0].receipts.get(t2.hash)!;
+    expect(r2.status).toBe("failed");
+    expect(r2.error).toMatch(/insufficient SHOP/);
+    expect(r2.logs).toHaveLength(0);
+    expect(sim.nodes[0].receipts.get(t1.hash)?.logs[0]).toMatchObject({ event: "Transfer", args: { amount: 300 } });
+    sim.step(1500); // let the last block finish gossiping
+    // all nodes agree
+    expect(new Set(sim.nodes.map((n) => n.head().hash)).size).toBe(1);
+    expect(new Set(sim.nodes.map((n) => n.state.root())).size).toBe(1);
+  });
+});

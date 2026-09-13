@@ -8,24 +8,26 @@ import { Tx } from "@/sim/tx";
 import { Block } from "@/sim/block";
 import { Lifecycle } from "./Lifecycle";
 import { FOCUS, FOCUS_ORDER, FocusId } from "./focus";
-import { BrowserWallet } from "./BrowserWallet";
+import { BrowserWallet, accountName } from "./BrowserWallet";
 import { BlockDetail } from "./BlockDetail";
 import { fmtEth } from "@/lib/eth";
+import { decodeData } from "@/sim/contracts";
 
 /* ---------- layout (a free field; scrolls if the window is smaller) ---------- */
-const CANVAS = { w: 1880, h: 960 };
-const APP = { x: 40, y: 70, w: 290, h: 330 };
-const RPC = { x: 430, y: 130, w: 190, h: 210 };
-const NODE = { x: 720, y: 70, w: 230, h: 330 };
+const CANVAS = { w: 2260, h: 960 };
+const APP = { x: 40, y: 70, w: 470, h: 310 };
+const RPC = { x: 590, y: 120, w: 190, h: 210 };
+const NODE = { x: 870, y: 70, w: 230, h: 330 };
 const PEERS = [
-  { x: 1090, y: 120 },
-  { x: 1300, y: 200 },
-  { x: 1130, y: 330 },
+  { x: 1240, y: 120 },
+  { x: 1450, y: 200 },
+  { x: 1280, y: 330 },
 ];
 const PEER_R = 34;
 const LIFE = { x: 40, y: 430, w: CANVAS.w - 80, h: 150 };
-const BOB_RPC = { x: 1400, y: 150, w: 150, h: 110 };
-const BOB = { x: 1610, y: 70, w: 230, h: 330 };
+const BOB_RPC = { x: 1550, y: 130, w: 160, h: 112 };
+const CONTRACT = { x: 1540, y: 262, w: 180, h: 150 };
+const BOB = { x: 1770, y: 70, w: 450, h: 310 };
 const BOB_Y = 200;
 const CHAIN_Y = 640;
 const BLOCK_W = 230;
@@ -38,7 +40,8 @@ const FOCUS_RECTS: Record<FocusId, { x: number; y: number; w: number; h: number 
   rpc: RPC,
   node: NODE,
   mempool: { x: NODE.x, y: NODE.y + 48, w: NODE.w, h: 240 },
-  network: { x: NODE.x + NODE.w - 10, y: 60, w: 1370 - (NODE.x + NODE.w - 10), h: 370 },
+  network: { x: NODE.x + NODE.w - 10, y: 60, w: 1520 - (NODE.x + NODE.w - 10), h: 370 },
+  contract: CONTRACT,
   bob: { x: BOB_RPC.x - 10, y: BOB.y, w: BOB.x + BOB.w - BOB_RPC.x + 10, h: BOB.h },
   block: { x: CANVAS.w - 40 - BLOCK_W, y: CHAIN_Y - 30, w: BLOCK_W, h: BLOCK_H + 30 },
   chain: { x: 40, y: CHAIN_Y - 30, w: CANVAS.w - 80, h: BLOCK_H + 30 },
@@ -110,12 +113,16 @@ function TxChip({ tx, walletIdx, small = false, appear = false }: { tx: Tx; wall
   const isTracked = tracked === tx.hash;
   const f = walletIdx(tx.from), t = walletIdx(tx.to);
   const name = (i: number) => (i === 0 ? "you" : i === 1 ? "bob" : i < 0 ? "?" : `w${i}`);
+  const call = tx.data ? (decodeData(tx.data) as { deploy?: string; method?: string; args?: unknown[] }) : null;
   return (
     <motion.div initial={appear ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={appear ? { delay: 0.85, duration: 0.2 } : undefined}
       onClick={() => setTracked(tx.hash)}
-      className={`flex cursor-pointer items-center gap-1 rounded border px-1.5 ${small ? "py-px text-[10px]" : "py-0.5 text-[11px]"} font-mono ${WALLET_COLORS[Math.max(0, f) % WALLET_COLORS.length]} ${isTracked ? "tx-glow relative z-10" : ""}`}>
+      className={`flex cursor-pointer items-center gap-1 rounded border px-1.5 ${small ? "py-px text-[10px]" : "py-0.5 text-[11px]"} font-mono ${call ? "border-violet-400/60 bg-violet-500/25 text-violet-100" : WALLET_COLORS[Math.max(0, f) % WALLET_COLORS.length]} ${isTracked ? "tx-glow relative z-10" : ""}`}>
+      {call ? (
+        <span className="truncate">{name(f)}→{call.deploy ? "new contract" : "SHOP"} <span className="opacity-80">{call.deploy ? `deploy ${call.deploy}` : `${call.method}(${call.args?.map((a) => (typeof a === "string" && a.startsWith("0x") ? name(walletIdx(a)) : String(a))).join(", ")})`}</span></span>
+      ) : (<>
       <span>{name(f)}→{name(t)}</span>
-      <span className="opacity-90">{fmtEth(tx.value, { unit: false })}</span>
+      <span className="opacity-90">{fmtEth(tx.value, { unit: false })}</span></>)}
       <span className="ml-auto opacity-50">{short(tx.hash, 2)}</span>
     </motion.div>
   );
@@ -168,7 +175,8 @@ function BlockCard({ b, i, total, walletIdx, proposerName, depth, onSelect, sele
 /* ---------- the page ---------- */
 export function LiveView() {
   useLive((s) => s.version);
-  const { sim, running, speed, setSpeed, traffic, rpcNode, tracked, flights, lastRpc, lastRpcBob, lastApplied, setRunning, setTraffic, removeFlight, reset } = useLive();
+  const { sim, running, speed, setSpeed, traffic, rpcNode, tracked, flights, lastRpc, lastRpcBob, lastApplied, tokenAddr, setRunning, setTraffic, removeFlight, reset } = useLive();
+  const accountLabel = (a: string) => accountName(sim, a) ?? short(a, 3);
   const flewSet = new Set((lastApplied?.entries ?? []).filter((e) => e.mempoolIdx !== null).map((e) => e.hash));
   const [focus, setFocusState] = useState<FocusId | null>(null);
   const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
@@ -282,7 +290,7 @@ export function LiveView() {
       <Runner />
       <header className="flex flex-wrap items-center gap-3 border-b border-zinc-800 px-4 py-2 text-xs">
         <span className="text-sm font-semibold">A blockchain, live</span>
-        <span className="text-zinc-500">Everything below is really happening in your browser: real signatures, real hashes, a toy network of 4 nodes, two users on two different RPCs, one block every 12 seconds like Ethereum.</span>
+        <span className="text-zinc-500">Everything below is really happening in your browser: real signatures, real hashes, a toy network of 4 nodes, two users on two different RPCs, a smart contract, one block every 12 seconds like Ethereum.</span>
         <span className="ml-auto flex items-center gap-2">
           <button className="rounded border border-zinc-700 px-2 py-1 hover:bg-zinc-800" onClick={() => setRunning(!running)}>{running ? "⏸ pause" : "▶ play"}</button>
           <span className="ml-1 text-zinc-500">speed</span>
@@ -367,10 +375,28 @@ export function LiveView() {
 
             {/* Bob: another person, another RPC, another node */}
             <Frame {...BOB_RPC} title="Another RPC" subtitle={`attached to ${sim.nodes[useLive.getState().bobNode].name}`} accent="emerald">
-              <div className="text-[10px] text-zinc-500">A different provider, reading a different node. Same chain.</div>
+              <div className="text-[10px] text-zinc-500">Different provider, different node, same chain.</div>
               {lastRpcBob && <div className="mt-1 truncate font-mono text-[10px] text-sky-300">→ {lastRpcBob.method}</div>}
             </Frame>
             <BrowserWallet {...BOB} owner="bob" compact />
+
+            {/* the smart contract, as stored by every node */}
+            <Frame {...CONTRACT} title="Smart contract" subtitle={tokenAddr ? `SHOP token · ${short(tokenAddr, 4)}` : "none deployed yet"} accent={tokenAddr ? "amber" : "zinc"}>
+              {tokenAddr ? (() => {
+                const acct = node.state.get(tokenAddr);
+                const bal = (acct.storage as { balances?: Record<string, number>; totalSupply?: number } | undefined)?.balances ?? {};
+                const rows = Object.entries(bal).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 4);
+                return (
+                  <div className="text-[10px]">
+                    <div className="text-zinc-500">code <span className="font-mono text-violet-300">Token {"{ transfer, balanceOf }"}</span></div>
+                    <div className="mt-1 text-zinc-500">storage <span className="text-zinc-600">(same on every node)</span></div>
+                    <table className="mt-0.5 w-full font-mono">
+                      <tbody>{rows.map(([a, v]) => <tr key={a}><td className="text-zinc-300">{accountLabel(a)}</td><td className="text-right text-violet-200">{v} SHOP</td></tr>)}</tbody>
+                    </table>
+                  </div>
+                );
+              })() : <div className="text-[10px] text-zinc-500">A contract is a program stored at an address. Bob can deploy one from his shop.</div>}
+            </Frame>
 
             {/* RPC */}
             <Frame {...RPC} title="RPC endpoint" subtitle={`attached to ${node.name}`} accent="emerald">
