@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { Simulation } from "@/sim/sim";
 import { encodeRawTx, Tx } from "@/sim/tx";
 import { Hex } from "@/sim/crypto";
+import { ETH, fmtEth } from "@/lib/eth";
 
 export type Hop = "app→rpc" | "rpc→node" | "node→rpc" | "rpc→app" | "bob→rpc2" | "rpc2→node2" | "node2→rpc2" | "rpc2→bob";
 export type Owner = "you" | "bob";
@@ -72,7 +73,7 @@ let get_speed = () => 1;
 export const useLive = create<LiveStore>((set, get) => {
   get_speed = () => get().speed;
   return {
-  sim: new Simulation({ seed: 7, nodeCount: 4, blockTimeMs: 12000, accountCount: 5, initialBalance: 1_000_000 }),
+  sim: new Simulation({ seed: 7, nodeCount: 4, blockTimeMs: 12000, accountCount: 5, initialBalance: 10 * ETH }),
   version: 0,
   running: true,
   speed: 1,
@@ -86,9 +87,9 @@ export const useLive = create<LiveStore>((set, get) => {
   lastRpcBob: null,
   tracked: null,
   setTracked: (tracked) => set({ tracked }),
-  balance: 1_000_000,
+  balance: 10 * ETH,
   blockNumber: 0,
-  bobBalance: 1_000_000,
+  bobBalance: 10 * ETH,
   bobBlockNumber: 0,
   incoming: [],
   lastApplied: null,
@@ -106,7 +107,7 @@ export const useLive = create<LiveStore>((set, get) => {
       const n = Math.floor(Math.random() * sim.nodes.length);
       const nonceRes = sim.rpc(n, { method: "eth_getTransactionCount", params: [sim.accounts[f].address, "pending"] });
       if (nonceRes.result) {
-        const tx = sim.buildAndSign(f, sim.accounts[t].address, 100 + Math.floor(Math.random() * 9000), 1 + Math.floor(Math.random() * 3), parseInt(nonceRes.result as string, 16));
+        const tx = sim.buildAndSign(f, sim.accounts[t].address, Math.round((0.01 + Math.random() * 0.49) * 1000) / 1000 * ETH, 1 + Math.floor(Math.random() * 3), parseInt(nonceRes.result as string, 16));
         sim.rpc(n, { method: "eth_sendRawTransaction", params: [encodeRawTx(tx)] });
       }
     }
@@ -189,7 +190,7 @@ export const useLive = create<LiveStore>((set, get) => {
         const last = { method: "eth_getBalance", params: [me.address.slice(0, 10) + "…", "latest"], response: bal };
         if (side.owner === "you") set({ blockNumber: newBn, balance: newBal ?? get().balance, lastRpc: last });
         else set({ bobBlockNumber: newBn, bobBalance: newBal ?? get().bobBalance, lastRpcBob: last });
-        addFlight({ label: newBal !== undefined ? `balance ${newBal}` : "error", hop: side.res, kind: "poll", ms: hop() });
+        addFlight({ label: newBal !== undefined ? `balance ${fmtEth(newBal)}` : "error", hop: side.res, kind: "poll", ms: hop() });
         for (const t of get().appTxs.filter((t) => t.status === "pending" && t.owner === side.owner)) {
           const r = sim.rpc(side.node, { method: "eth_getTransactionReceipt", params: [t.hash] });
           const rec = r.result as { blockNumber: number; status: string; fee: number } | null;
@@ -201,6 +202,6 @@ export const useLive = create<LiveStore>((set, get) => {
       }, hop());
     }
   },
-  reset: () => set({ sim: new Simulation({ seed: Math.floor(Math.random() * 1e6), nodeCount: 4, blockTimeMs: 12000, accountCount: 5, initialBalance: 1_000_000 }), appTxs: [], flights: [], lastRpc: null, lastRpcBob: null, tracked: null, balance: 1_000_000, blockNumber: 0, bobBalance: 1_000_000, bobBlockNumber: 0, incoming: [], lastApplied: null, version: 0 }),
+  reset: () => set({ sim: new Simulation({ seed: Math.floor(Math.random() * 1e6), nodeCount: 4, blockTimeMs: 12000, accountCount: 5, initialBalance: 10 * ETH }), appTxs: [], flights: [], lastRpc: null, lastRpcBob: null, tracked: null, balance: 10 * ETH, blockNumber: 0, bobBalance: 10 * ETH, bobBlockNumber: 0, incoming: [], lastApplied: null, version: 0 }),
 };
 });

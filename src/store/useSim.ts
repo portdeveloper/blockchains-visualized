@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import { Simulation } from "@/sim/sim";
 import { Hex } from "@/sim/crypto";
+import { ETH } from "@/lib/eth";
 
 export interface RpcHistoryItem {
   id: number;
@@ -37,7 +38,7 @@ interface SimStore {
 let rpcId = 1;
 
 export const useSim = create<SimStore>((set, get) => ({
-  sim: new Simulation({ seed: 42, nodeCount: 6, blockTimeMs: 5000 }),
+  sim: new Simulation({ seed: 42, nodeCount: 6, blockTimeMs: 5000, initialBalance: 10 * ETH }),
   version: 0,
   running: true,
   speed: 1,
@@ -55,7 +56,7 @@ export const useSim = create<SimStore>((set, get) => ({
   selectNode: (selectedNode) => set({ selectedNode }),
   selectBlock: (selectedBlock) => set({ selectedBlock, selectedTx: null }),
   selectTx: (selectedTx) => set({ selectedTx }),
-  reset: (seed = 42) => set({ sim: new Simulation({ seed, nodeCount: 6, blockTimeMs: 5000 }), version: 0, selectedBlock: null, selectedTx: null, rpcHistory: [] }),
+  reset: (seed = 42) => set({ sim: new Simulation({ seed, nodeCount: 6, blockTimeMs: 5000, initialBalance: 10 * ETH }), version: 0, selectedBlock: null, selectedTx: null, rpcHistory: [] }),
   toggleNode: (id) => {
     const n = get().sim.nodes[id];
     n.online = !n.online;

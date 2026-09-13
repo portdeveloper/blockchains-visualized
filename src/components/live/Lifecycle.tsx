@@ -4,6 +4,7 @@ import { useLive } from "@/store/useLive";
 import { short } from "@/sim/crypto";
 import { verifyTx, txFee } from "@/sim/tx";
 import { accountName } from "./BrowserWallet";
+import { fmtEth, fmtGwei } from "@/lib/eth";
 
 interface Stage { title: string; detail: React.ReactNode; state: "done" | "now" | "todo" | "bad"; t?: number }
 
@@ -34,7 +35,7 @@ export function Lifecycle({ x, y, w, h }: { x: number; y: number; w: number; h: 
       heading = (
         <span className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-zinc-100">Life of transaction <span className="font-mono text-sky-300">{short(tracked, 5)}</span></span>
-          <span className="text-zinc-400">{walletName(tx.from)} → {walletName(tx.to)} · {tx.value.toLocaleString()} · nonce {tx.nonce} · gasPrice {tx.gasPrice}</span>
+          <span className="text-zinc-400">{walletName(tx.from)} → {walletName(tx.to)} · {fmtEth(tx.value)} · nonce {tx.nonce} · gas price {fmtGwei(tx.gasPrice)}</span>
           <button className="ml-auto text-[10px] text-zinc-500 hover:text-zinc-300" onClick={() => setTracked(null)}>stop following</button>
         </span>
       );
@@ -47,7 +48,7 @@ export function Lifecycle({ x, y, w, h }: { x: number; y: number; w: number; h: 
           : { title: "4 · In mempool", state: entry ? "done" : "todo", t: entry?.t, detail: entry ? <>node checked the signature and nonce, then queued it</> : <>—</> },
         { title: "5 · Gossiped", state: known.length >= sim.nodes.length ? "done" : known.length > 0 ? "now" : "todo", detail: <>known by {known.length}/{sim.nodes.length} nodes{events.filter((e) => e.type === "tx-received" && e.accepted).length > 1 && <> · {events.filter((e) => e.type === "tx-received" && e.accepted).map((e) => `${sim.nodes[e.node].name.split(" ")[0]} ${fmt(e.t)}`).join(", ")}</>}</> },
         { title: "6 · In a block", state: receipt ? "done" : known.length > 0 && !rejected ? "now" : "todo", t: block?.header.timestamp, detail: receipt && block ? <>block #{receipt.blockNumber} by {nodeName(block.header.proposer)}, position {receipt.index}</> : <>waiting for the next proposer to pick it{!rejected && known.length > 0 && <> · next block in {(Math.max(0, sim.nextProposalAt - sim.now) / 1000).toFixed(0)}s</>}</> },
-        { title: "7 · Executed", state: receipt ? (receipt.status === "success" ? "done" : "bad") : "todo", detail: receipt ? <>{receipt.status} · fee {txFee(tx).toLocaleString()} paid to {block ? nodeName(block.header.proposer) : "proposer"}{receipt.error && <> · {receipt.error}</>}</> : <>every node will re-run it and update balances</> },
+        { title: "7 · Executed", state: receipt ? (receipt.status === "success" ? "done" : "bad") : "todo", detail: receipt ? <>{receipt.status} · fee {fmtEth(txFee(tx))} paid to {block ? nodeName(block.header.proposer) : "proposer"}{receipt.error && <> · {receipt.error}</>}</> : <>every node will re-run it and update balances</> },
         { title: "8 · Confirmed", state: confs >= 2 ? "done" : receipt ? "now" : "todo", detail: receipt ? <>{confs} block{confs === 1 ? "" : "s"} built on top{app?.receiptAt !== undefined && <> · app fetched receipt at {fmt(app.receiptAt)}</>}. Ethereum treats it as final after ~13 min.</> : <>—</> },
       ];
     }

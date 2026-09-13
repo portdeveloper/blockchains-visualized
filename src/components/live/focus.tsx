@@ -89,7 +89,7 @@ export const FOCUS: Record<FocusId, FocusInfo> = {
       </>
     ),
     watch: ["The prev field matches the hash of the block to its left.", "A green tick means the transaction succeeded, a red cross means it ran but failed and still paid its fee.", "Empty blocks are normal. The proposer simply had nothing to include."],
-    ethereum: ["One block every 12 seconds.", "A block holds a few hundred transactions, bounded by a gas limit in the tens of millions."],
+    ethereum: ["One block every 12 seconds.", "A block holds a few hundred transactions, bounded by a gas limit in the tens of millions.", "A simple transfer costs 21,000 gas. At 2 gwei per gas that is 0.000042 ETH."],
   },
   chain: {
     id: "chain", label: "chain", title: "The chain",

@@ -2,6 +2,7 @@
 import { useSim } from "@/store/useSim";
 import { short } from "@/sim/crypto";
 import { Panel, Mono } from "./ui";
+import { fmtEth } from "@/lib/eth";
 
 export function NodePanel() {
   useSim((s) => s.version);
@@ -25,7 +26,7 @@ export function NodePanel() {
                   <div className="flex items-center gap-2">
                     <Mono className="text-sky-300">{short(tx.hash, 4)}</Mono>
                     <span className="text-zinc-400">{label(tx.from)} → {label(tx.to)}</span>
-                    <Mono className="ml-auto">{tx.value.toLocaleString()}</Mono>
+                    <Mono className="ml-auto">{fmtEth(tx.value)}</Mono>
                   </div>
                   <div className="text-[10px] text-zinc-600">nonce {tx.nonce} · gasPrice {tx.gasPrice}{!c.ok && <span className="text-amber-400"> · waiting: {c.reason}</span>}</div>
                 </li>
@@ -36,18 +37,18 @@ export function NodePanel() {
         <div>
           <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">State (this node&apos;s copy)</h3>
           <table className="w-full text-xs">
-            <thead className="text-[10px] text-zinc-500"><tr><th className="text-left font-normal">account</th><th className="text-right font-normal">balance</th><th className="text-right font-normal">nonce</th></tr></thead>
+            <thead className="text-[10px] text-zinc-500"><tr><th className="text-left font-normal">account</th><th className="text-right font-normal">balance (ETH)</th><th className="text-right font-normal">nonce</th></tr></thead>
             <tbody>
               {sim.accounts.map((k, i) => { const a = node.state.get(k.address); return (
                 <tr key={k.address} className="border-t border-zinc-800/60">
                   <td className="py-0.5">wallet {i} <Mono className="text-zinc-500">{short(k.address, 3)}</Mono></td>
-                  <td className="py-0.5 text-right font-mono">{a.balance.toLocaleString()}</td>
+                  <td className="py-0.5 text-right font-mono">{fmtEth(a.balance, { unit: false })}</td>
                   <td className="py-0.5 text-right font-mono text-zinc-400">{a.nonce}</td>
                 </tr>); })}
               {sim.nodes.filter((n) => node.state.get(n.address).balance > 0).map((n) => (
                 <tr key={n.address} className="border-t border-zinc-800/60 text-zinc-400">
                   <td className="py-0.5">{n.name} <span className="text-[10px] text-zinc-600">(fees)</span></td>
-                  <td className="py-0.5 text-right font-mono">{node.state.get(n.address).balance.toLocaleString()}</td>
+                  <td className="py-0.5 text-right font-mono">{fmtEth(node.state.get(n.address).balance, { unit: false })}</td>
                   <td className="py-0.5 text-right font-mono">{node.state.get(n.address).nonce}</td>
                 </tr>
               ))}

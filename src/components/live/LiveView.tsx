@@ -10,6 +10,7 @@ import { Lifecycle } from "./Lifecycle";
 import { FOCUS, FOCUS_ORDER, FocusId } from "./focus";
 import { BrowserWallet } from "./BrowserWallet";
 import { BlockDetail } from "./BlockDetail";
+import { fmtEth } from "@/lib/eth";
 
 /* ---------- layout (a free field; scrolls if the window is smaller) ---------- */
 const CANVAS = { w: 1880, h: 960 };
@@ -114,7 +115,7 @@ function TxChip({ tx, walletIdx, small = false, appear = false }: { tx: Tx; wall
       onClick={() => setTracked(tx.hash)}
       className={`flex cursor-pointer items-center gap-1 rounded border px-1.5 ${small ? "py-px text-[10px]" : "py-0.5 text-[11px]"} font-mono ${WALLET_COLORS[Math.max(0, f) % WALLET_COLORS.length]} ${isTracked ? "tx-glow relative z-10" : ""}`}>
       <span>{name(f)}→{name(t)}</span>
-      <span className="opacity-90">{tx.value}</span>
+      <span className="opacity-90">{fmtEth(tx.value, { unit: false })}</span>
       <span className="ml-auto opacity-50">{short(tx.hash, 2)}</span>
     </motion.div>
   );
@@ -149,7 +150,7 @@ function BlockCard({ b, i, total, walletIdx, proposerName, depth, onSelect, sele
         </div>
         <div className="font-mono text-[10px] text-zinc-400">hash {short(b.hash, 6)}</div>
         <div className="font-mono text-[10px] text-zinc-600">prev {short(b.header.parentHash, 6)}</div>
-        <div className="flex justify-between text-[10px] text-zinc-500"><span>by {proposerName}</span><span>{b.txs.length} tx{fees > 0 && <span className="text-amber-400/80"> · fees {fees.toLocaleString()}</span>}</span></div>
+        <div className="flex justify-between text-[10px] text-zinc-500"><span>by {proposerName}</span><span>{b.txs.length} tx{fees > 0 && <span className="text-amber-400/80"> · fees {fmtEth(fees)}</span>}</span></div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden p-2">
         {b.txs.length === 0 && <div className="text-[11px] text-zinc-600">no transactions</div>}
@@ -348,7 +349,7 @@ export function LiveView() {
                     <text x={p.x} y={p.y - 4} fill="#e4e4e7" fontSize={12} textAnchor="middle" fontWeight={600}>#{n.head().header.number}</text>
                     <text x={p.x} y={p.y + 10} fill="#a1a1aa" fontSize={9} textAnchor="middle">{n.mempool.size} pending</text>
                     <text x={p.x} y={p.y + PEER_R + 14} fill="#a1a1aa" fontSize={10} textAnchor="middle">{n.name}{isProp ? " · proposing next" : ""}</text>
-                    <text x={p.x} y={p.y + PEER_R + 26} fill="#f59e0b" fillOpacity={0.8} fontSize={9} textAnchor="middle">earned {n.state.get(n.address).balance.toLocaleString()} in fees</text>
+                    <text x={p.x} y={p.y + PEER_R + 26} fill="#f59e0b" fillOpacity={0.8} fontSize={9} textAnchor="middle">earned {fmtEth(n.state.get(n.address).balance)} in fees</text>
                   </g>
                 );
               })}
@@ -396,7 +397,7 @@ export function LiveView() {
               </div>
               <div className="mt-3 border-t border-zinc-800 pt-2 text-[10px] text-zinc-500">
                 state root <span className="font-mono text-zinc-400">{short(node.state.root(), 5)}</span>
-                <div className="mt-0.5 text-amber-400/80">earned {node.state.get(node.address).balance.toLocaleString()} in fees so far</div>
+                <div className="mt-0.5 text-amber-400/80">earned {fmtEth(node.state.get(node.address).balance)} in fees so far</div>
                 {proposer?.id === node.id && <div className="mt-1 text-amber-300">this node proposes the next block</div>}
               </div>
             </Frame>

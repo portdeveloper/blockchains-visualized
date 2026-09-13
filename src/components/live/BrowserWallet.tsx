@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useLive, Owner } from "@/store/useLive";
 import { short, keypairFromPriv, keccak, fromHex } from "@/sim/crypto";
 import { GAS_PER_TX } from "@/sim/tx";
+import { fmtEth, fmtGwei, parseEth } from "@/lib/eth";
 
 const GAS_PRICE = 2;
 
@@ -27,10 +28,10 @@ export function BrowserWallet({ x, y, w, h, owner, compact = false }: { x: numbe
   const appTxs = st.appTxs.filter((t) => t.owner === owner);
   const toasts = st.incoming.filter((t) => t.owner === owner);
   const [to, setTo] = useState(owner === "you" ? 1 : 0);
-  const [amount, setAmount] = useState(owner === "you" ? "5000" : "3000");
+  const [amount, setAmount] = useState(owner === "you" ? "0.1" : "0.05");
   const [popup, setPopup] = useState<"closed" | "confirm" | "signing" | "account">("closed");
   const me = sim.accounts[acctIdx];
-  const value = parseInt(amount) || 0;
+  const value = parseEth(amount);
   const fee = GAS_PER_TX * GAS_PRICE;
   const nonceRes = sim.rpc(nodeId, { method: "eth_getTransactionCount", params: [me.address, "pending"] });
   const nonce = nonceRes.result ? parseInt(nonceRes.result as string, 16) : 0;
@@ -58,19 +59,19 @@ export function BrowserWallet({ x, y, w, h, owner, compact = false }: { x: numbe
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-[11px] text-zinc-500">balance <span className="text-zinc-600">· block #{blockNumber}</span></span>
-            <motion.span key={balance} initial={{ scale: 1.15, color: "#7dd3fc" }} animate={{ scale: 1, color: "#f4f4f5" }} className={`font-mono font-semibold ${compact ? "text-lg" : "text-xl"}`}>{balance.toLocaleString()}</motion.span>
+            <motion.span key={balance} initial={{ scale: 1.15, color: "#7dd3fc" }} animate={{ scale: 1, color: "#f4f4f5" }} className={`font-mono font-semibold ${compact ? "text-base" : "text-xl"}`}>{fmtEth(balance)}</motion.span>
           </div>
-          <div className={`mt-2 grid gap-2 text-xs ${compact ? "grid-cols-[minmax(0,1fr)_56px]" : "grid-cols-[minmax(0,1fr)_70px]"}`}>
+          <div className={`mt-2 grid gap-2 text-xs ${compact ? "grid-cols-[minmax(0,1fr)_64px]" : "grid-cols-[minmax(0,1fr)_84px]"}`}>
             <select className="min-w-0 truncate rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-[11px]" value={to} onChange={(e) => setTo(+e.target.value)}>
               {sim.accounts.map((k, i) => i !== acctIdx && <option key={k.address} value={i}>to {label(k.address)} ({short(k.address, 3)})</option>)}
             </select>
-            <input className="min-w-0 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-xs" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <div className="relative min-w-0"><input className={`w-full min-w-0 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-xs ${compact ? "" : "pr-8"}`} value={amount} onChange={(e) => setAmount(e.target.value)} title="amount in ETH" />{!compact && <span className="pointer-events-none absolute right-2 top-1.5 text-[9px] text-zinc-500">ETH</span>}</div>
           </div>
           <button className="mt-2 w-full rounded bg-sky-500 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-sky-400 disabled:opacity-50" disabled={popup !== "closed"} onClick={() => setPopup("confirm")}>{owner === "you" ? "Send" : "Pay"}</button>
           <AnimatePresence>
             {toasts.map((t) => (
               <motion.div key={t.id} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-2 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200">
-                +{t.value.toLocaleString()} received from {label(t.from)} in block #{t.block}.{!compact && " You did nothing; the chain simply updated."}
+                +{fmtEth(t.value)} received from {label(t.from)} in block #{t.block}.{!compact && " You did nothing; the chain simply updated."}
               </motion.div>
             ))}
           </AnimatePresence>
@@ -79,7 +80,7 @@ export function BrowserWallet({ x, y, w, h, owner, compact = false }: { x: numbe
             {appTxs.map((t) => (
               <div key={t.hash} onClick={() => setTracked(t.hash)} className={`flex cursor-pointer items-center gap-2 whitespace-nowrap rounded bg-zinc-950 px-2 py-1 ${tracked === t.hash ? "tx-glow" : ""}`}>
                 <span className="min-w-0 flex-1 truncate">
-                  <span className="text-zinc-300">{t.value.toLocaleString()} → {label(sim.accounts[t.to].address)}</span> <span className="text-zinc-600">nonce {t.tx.nonce}</span>{t.fee && <span className="text-zinc-600"> · fee {t.fee.toLocaleString()}</span>}
+                  <span className="text-zinc-300">{fmtEth(t.value)} → {label(sim.accounts[t.to].address)}</span> <span className="text-zinc-600">nonce {t.tx.nonce}</span>{t.fee && <span className="text-zinc-600"> · fee {fmtEth(t.fee)}</span>}
                 </span>
                 <span className={`shrink-0 rounded px-1.5 py-px text-[10px] ${t.status === "mined" ? "bg-emerald-500/20 text-emerald-300" : t.status === "rejected" ? "bg-rose-500/20 text-rose-300" : "bg-amber-500/20 text-amber-300"}`}>
                   {t.status === "mined" ? `✓ block #${t.block}` : t.status === "rejected" ? "rejected" : t.status}
@@ -108,10 +109,10 @@ export function BrowserWallet({ x, y, w, h, owner, compact = false }: { x: numbe
                 <dl className="mt-2 space-y-1 text-[11px]">
                   <div className="flex justify-between"><dt className="text-zinc-500">from</dt><dd className="font-mono text-zinc-300">{label(me.address)} · {short(me.address, 3)}</dd></div>
                   <div className="flex justify-between"><dt className="text-zinc-500">to</dt><dd className="font-mono text-zinc-300">{label(sim.accounts[to].address)} · {short(sim.accounts[to].address, 3)}</dd></div>
-                  <div className="flex justify-between"><dt className="text-zinc-500">amount</dt><dd className="font-mono text-zinc-100">{value.toLocaleString()}</dd></div>
+                  <div className="flex justify-between"><dt className="text-zinc-500">amount</dt><dd className="font-mono text-zinc-100">{fmtEth(value)}</dd></div>
                   <div className="flex justify-between"><dt className="text-zinc-500">nonce</dt><dd className="font-mono text-zinc-300">{nonce} <span className="text-zinc-600">(tx #{nonce + 1} from this account)</span></dd></div>
-                  <div className="flex justify-between"><dt className="text-zinc-500">gas fee</dt><dd className="font-mono text-zinc-300">{GAS_PER_TX.toLocaleString()} × {GAS_PRICE} = {fee.toLocaleString()}</dd></div>
-                  <div className="flex justify-between border-t border-zinc-800 pt-1"><dt className="text-zinc-400">total</dt><dd className="font-mono text-zinc-100">{(value + fee).toLocaleString()}</dd></div>
+                  <div className="flex justify-between"><dt className="text-zinc-500">gas fee</dt><dd className="font-mono text-zinc-300">{GAS_PER_TX.toLocaleString()} gas × {fmtGwei(GAS_PRICE)} = {fmtEth(fee)}</dd></div>
+                  <div className="flex justify-between border-t border-zinc-800 pt-1"><dt className="text-zinc-400">total</dt><dd className="font-mono text-zinc-100">{fmtEth(value + fee)}</dd></div>
                 </dl>
                 <div className="mt-2 rounded bg-zinc-900 p-2 text-[10px] leading-snug text-zinc-500">The website built this transaction but cannot sign it. Only this extension holds the private key. The nonce is a counter: it keeps transactions in order and stops anyone replaying this one.</div>
                 <div className="mt-2 grid grid-cols-2 gap-2">

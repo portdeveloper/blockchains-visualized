@@ -4,6 +4,7 @@ import { short } from "@/sim/crypto";
 import { headerHash } from "@/sim/block";
 import { Panel, Mono, Tag } from "./ui";
 import { useState } from "react";
+import { fmtEth } from "@/lib/eth";
 
 export function BlockInspector() {
   useSim((s) => s.version);
@@ -59,8 +60,8 @@ export function BlockInspector() {
               <span className="text-zinc-600">{i}</span>
               <button className="font-mono text-sky-300 hover:underline" onClick={() => selectTx(tx.hash)}>{short(tx.hash, 5)}</button>
               <span className="text-zinc-400">{label(tx.from)} → {label(tx.to)}</span>
-              <Mono className="text-zinc-200">{tx.value.toLocaleString()}</Mono>
-              <span className="text-zinc-600">nonce {tx.nonce} · gas {tx.gasPrice}</span>
+              <Mono className="text-zinc-200">{fmtEth(tx.value)}</Mono>
+              <span className="text-zinc-600">nonce {tx.nonce} · {tx.gasPrice} gwei</span>
               <span className="ml-auto"><Tag color={r?.status === "success" ? "emerald" : "rose"}>{r?.status}</Tag></span>
               {r?.error && <span className="w-full text-[10px] text-rose-300/80">{r.error}</span>}
             </li>

@@ -4,6 +4,7 @@ import { useLive } from "@/store/useLive";
 import { short } from "@/sim/crypto";
 import { Block } from "@/sim/block";
 import { accountName } from "./BrowserWallet";
+import { fmtEth, fmtDelta } from "@/lib/eth";
 
 export function BlockDetail({ block, onClose, width }: { block: Block; onClose: () => void; width: number }) {
   useLive((s) => s.version);
@@ -39,19 +40,19 @@ export function BlockDetail({ block, onClose, width }: { block: Block; onClose: 
         <p className="mt-2 text-xs text-zinc-600">Nothing changed. Empty block, no fees.</p>
       ) : (
         <table className="mt-2 w-full text-[11px]">
-          <thead className="text-[10px] text-zinc-500"><tr><th className="text-left font-normal">account</th><th className="text-right font-normal">before</th><th className="text-right font-normal">after</th><th className="text-right font-normal">Δ</th></tr></thead>
+          <thead className="text-[10px] text-zinc-500"><tr><th className="text-left font-normal">account</th><th className="text-right font-normal">before (ETH)</th><th className="text-right font-normal">after (ETH)</th><th className="text-right font-normal">Δ</th></tr></thead>
           <tbody>
             {rows.map((r) => { const d = r.af.balance - r.b.balance; return (
               <tr key={r.a} className="border-t border-zinc-800/70 font-mono">
                 <td className="py-1 text-zinc-300">{name(r.a)}{r.af.nonce !== r.b.nonce && <span className="ml-1 text-[9px] text-zinc-500">nonce {r.b.nonce}→{r.af.nonce}</span>}</td>
-                <td className="py-1 text-right text-zinc-500">{r.b.balance.toLocaleString()}</td>
-                <td className="py-1 text-right text-zinc-200">{r.af.balance.toLocaleString()}</td>
-                <td className={`py-1 text-right ${d > 0 ? "text-emerald-300" : d < 0 ? "text-rose-300" : "text-zinc-500"}`}>{d > 0 ? "+" : ""}{d.toLocaleString()}</td>
+                <td className="py-1 text-right text-zinc-500">{fmtEth(r.b.balance, { unit: false })}</td>
+                <td className="py-1 text-right text-zinc-200">{fmtEth(r.af.balance, { unit: false })}</td>
+                <td className={`py-1 text-right ${d > 0 ? "text-emerald-300" : d < 0 ? "text-rose-300" : "text-zinc-500"}`}>{fmtDelta(d)}</td>
               </tr>); })}
           </tbody>
         </table>
       )}
-      {fees > 0 && <p className="mt-3 rounded bg-amber-500/10 p-2 text-[11px] text-amber-200">Fees in this block: {fees.toLocaleString()}, paid to {name(block.header.proposer)} for doing the work of proposing it.</p>}
+      {fees > 0 && <p className="mt-3 rounded bg-amber-500/10 p-2 text-[11px] text-amber-200">Fees in this block: {fmtEth(fees)}, paid to {name(block.header.proposer)} for doing the work of proposing it.</p>}
       <button className="mt-auto self-start pt-6 text-sm text-zinc-500 hover:text-zinc-300" onClick={onClose}>close</button>
     </motion.aside>
   );
