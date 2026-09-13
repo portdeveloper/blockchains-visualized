@@ -14,22 +14,22 @@ import { fmtEth } from "@/lib/eth";
 import { decodeData } from "@/sim/contracts";
 
 /* ---------- layout (a free field; scrolls if the window is smaller) ---------- */
-const CANVAS = { w: 2260, h: 960 };
-const APP = { x: 40, y: 70, w: 470, h: 310 };
-const RPC = { x: 590, y: 120, w: 190, h: 210 };
-const NODE = { x: 870, y: 70, w: 230, h: 330 };
+const CANVAS = { w: 2400, h: 980 };
+const APP = { x: 40, y: 60, w: 540, h: 350 };
+const RPC = { x: 660, y: 120, w: 190, h: 210 };
+const NODE = { x: 940, y: 60, w: 230, h: 350 };
 const PEERS = [
-  { x: 1240, y: 120 },
-  { x: 1450, y: 200 },
-  { x: 1280, y: 330 },
+  { x: 1310, y: 120 },
+  { x: 1520, y: 200 },
+  { x: 1350, y: 330 },
 ];
 const PEER_R = 34;
-const LIFE = { x: 40, y: 430, w: CANVAS.w - 80, h: 150 };
-const BOB_RPC = { x: 1550, y: 130, w: 160, h: 112 };
-const CONTRACT = { x: 1540, y: 262, w: 180, h: 150 };
-const BOB = { x: 1770, y: 70, w: 450, h: 310 };
+const LIFE = { x: 40, y: 440, w: CANVAS.w - 80, h: 150 };
+const BOB_RPC = { x: 1620, y: 130, w: 160, h: 112 };
+const CONTRACT = { x: 1610, y: 262, w: 180, h: 150 };
+const BOB = { x: 1820, y: 60, w: 540, h: 350 };
 const BOB_Y = 200;
-const CHAIN_Y = 640;
+const CHAIN_Y = 650;
 const BLOCK_W = 230;
 const BLOCK_GAP = 50;
 const BLOCK_H = 300;
@@ -40,7 +40,7 @@ const FOCUS_RECTS: Record<FocusId, { x: number; y: number; w: number; h: number 
   rpc: RPC,
   node: NODE,
   mempool: { x: NODE.x, y: NODE.y + 48, w: NODE.w, h: 240 },
-  network: { x: NODE.x + NODE.w - 10, y: 60, w: 1520 - (NODE.x + NODE.w - 10), h: 370 },
+  network: { x: NODE.x + NODE.w - 10, y: 60, w: 1590 - (NODE.x + NODE.w - 10), h: 370 },
   contract: CONTRACT,
   bob: { x: BOB_RPC.x - 10, y: BOB.y, w: BOB.x + BOB.w - BOB_RPC.x + 10, h: BOB.h },
   block: { x: CANVAS.w - 40 - BLOCK_W, y: CHAIN_Y - 30, w: BLOCK_W, h: BLOCK_H + 30 },
@@ -378,7 +378,7 @@ export function LiveView() {
               <div className="text-[10px] text-zinc-500">Different provider, different node, same chain.</div>
               {lastRpcBob && <div className="mt-1 truncate font-mono text-[10px] text-sky-300">→ {lastRpcBob.method}</div>}
             </Frame>
-            <BrowserWallet {...BOB} owner="bob" compact />
+            <BrowserWallet {...BOB} owner="bob" />
 
             {/* the smart contract, as stored by every node */}
             <Frame {...CONTRACT} title="Smart contract" subtitle={tokenAddr ? `SHOP token · ${short(tokenAddr, 4)}` : "none deployed yet"} accent={tokenAddr ? "amber" : "zinc"}>
